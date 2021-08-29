@@ -3,48 +3,49 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
+import pandas as pd
 
-# StatNet-Predictor: predict desired match result stat(s) based on match stat feature vector
-class Predictor:
-    def __init__(self, feature_size, output_size):
-        # Model Architecture
-        self.network = nn.Sequential(
-            nn.Linear(in_features=feature_size, out_features=feature_size, bias=True),
+import os
+import sys
+
+# data processing
+# read data as numpy then use torch.from_numpy() to convert to torch tensor
+
+# StatNet: generate desired match stats feature vector based on desired match result stats feature vector
+class StatNet(nn.Module):
+    def __init__(self, in_size, out_size):
+        super(StatNet, self).__init__()
+        self.model = nn.Sequential(
+            nn.Linear(in_features=in_size, out_features=out_size, bias=True),
             nn.ReLU(),
-            nn.Linear(in_features=feature_size, out_features=feature_size, bias=True),
-            nn.ReLU(),
-            nn.Linear(in_features=feature_size, out_features=output_size, bias=True),
+            nn.Linear(in_features=out_size, out_features=out_size, bias=True),
             nn.ReLU()
         )
-    def forward(self, input_feature):
-        return self.network(input_feature)
-    def fit(self, train_x, train_y, epoch, learning_rate):
-        optimizer = optim.SGD(params=self.network, lr=learning_rate)
-        # Train
-        for itr in range(epoch):
-            for d in range(train_x.shape[0]): # Batch=1
-                optimizer.zero_grad()
-                yhat = self.network(train_x[d])
-                loss = nn.MSELoss(yhat, train_y[d])
-                loss.backward()
-                optimizer.step()
+    def forward(self, x):
+        return self.model(x)
 
-# StatNet-Reconstructor: reconstruct feature vector based on predicted match result stat(s)
-class Reconstructor:
-    def __init__(self, feature_size, output_size):
-        # Model Architecture
-        self.network = nn.Sequential(
-            nn.Linear(in_features=feature_size, out_features=feature_size, bias=True),
-            nn.ReLU(),
-            nn.Linear(in_features=feature_size, out_features=output_size, bias=True),
-            nn.ReLU()
-        )
-
-# StatNet: predict match result stat(s) based on match stat feature vector and reconstruct ideal match stat feature vector
-class StatNet:
-    def __init__(self, feature_size, output_size):
-        self.predictor = Predictor(feature_size, output_size)
-        self.reconstructor = Reconstructor(output_size, feature_size)
+def train(model, train_x, train_y, epoch, learning_rate):
+    size = train_x.shape[0]
+    # optimization
+    loss_fn = nn.MSELoss()
+    optimizer = optim.SGD(model.parameters(), lr=learning_rate)
+    for itr in range(1, epoch+1):
+        epoch_loss = 0.00
+        for d in range(size): # batch=1
+            optimizer.zero_grad()
+            yhat = model(train_x[d])
+            loss = loss_fn(yhat, train_y[d])
+            epoch_loss += loss.item()
+            loss.backward()
+            optimizer.step()
+        epoch_loss /= size
+        if itr % int(epoch / 10) == 0:
+            print("Epoch {}: Loss = {}" .format(itr, epoch_loss))
 
 if __name__ == "__main__":
-    model = StatNet(feature_size=5, output_size=1)
+    model = StatNet(in_size=1, out_size=5)
+    train_x = torch.rand(100,1)
+    train_y = torch.rand(100,5)
+
+    train(model, train_x, train_y, 1000, 0.01)
