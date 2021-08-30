@@ -54,6 +54,10 @@ def main():
     model = StatNet()
 
     if mode == "train":
+        epoch = int(sys.argv[3])
+        learning_rate = float(sys.argv[4])
+        test_size = float(sys.argv[5])
+        # load pre-trained model (if exists)
         try:
             model.load_state_dict(torch.load(path))
         except Exception as e:
@@ -68,7 +72,7 @@ def main():
         train_y = torch.rand(100,5)
 
         print("\n{}\n" .format(model))
-        train(model, train_x, train_y, 1000, 0.01)
+        train(model, train_x, train_y, epoch, learning_rate)
         torch.save(model.module.state_dict(), path)
 
     elif mode == "eval":
