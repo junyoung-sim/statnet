@@ -5,15 +5,12 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
 import os
 import sys
 
-# data processing method here
-# read x, y
-# shuffle
-# partition
-# torch.from_numpy()
+from data import read
 
 # StatNet: predict match performance stats feature vector based on match result stat(s)
 class StatNet(nn.Module):
@@ -47,42 +44,49 @@ def train(model, train_x, train_y, epoch, learning_rate):
             print("Epoch {}: Loss = {}" .format(itr, epoch_loss))
 
 def main():
-    mode     = sys.argv[1]
-    model_id = sys.argv[2]
-    path = "./models/{}.pth" .format(model_id)
+    model_id      = sys.argv[1]
+    in_size       = int(sys.argv[2])
+    out_size      = int(sys.argv[3])
+    epoch         = int(sys.argv[4])
+    learning_rate = float(sys.argv[5])
+    filename      = sys.argv[6]
 
-    model = StatNet()
+    path = "./models/{}" .format(model_id)
 
-    if mode == "train":
-        epoch = int(sys.argv[3])
-        learning_rate = float(sys.argv[4])
-        test_size = float(sys.argv[5])
-        # load pre-trained model (if exists)
-        try:
-            model.load_state_dict(torch.load(path))
-        except Exception as e:
-            # pre-trained model does not exist; inquire new model shape
-            in_size = input("Input feature size = ")
-            out_size = input("Output feature size = ")
-            model = StatNet(in_size, out_size)
-        #
-        # data processing
-        #
-        train_x = torch.rand(100,1)
-        train_y = torch.rand(100,5)
+    model = StatNet(in_size, out_size)
+    # load pre-trained model (if exists)
+    try:
+        model.load_state_dict(torch.load(path))
+    except Exception as e:
+        # pre-trained model does not exist
+        pass
 
-        print("\n{}\n" .format(model))
-        train(model, train_x, train_y, epoch, learning_rate)
-        torch.save(model.module.state_dict(), path)
+    # read data
+    labels, match_outcome, match_stats = read(filename, in_size, out_size)
+    match_outcome = torch.tensor(match_outcome, dtype=torch.float32)
+    match_stats   = torch.tensor(match_stats, dtype=torch.float32)
 
-    elif mode == "eval":
-        try:
-            model.load_state_dict(torch.load(path))
-            # do work here
-        except Exception as e:
-            # model does not exist; abort operation
-            print(e)
+    # train
+    print("\n{}\n" .format(model))
+    train(model, match_outcome, match_stats, epoch, learning_rate)
+    torch.save(model.state_dict(), path)
+
+    # test
+    test_x = torch.tensor([
+        [1.1, 1.0],
+        [1.2, 1.0],
+        [1.3, 1.0],
+        [1.4, 1.0],
+        [1.5, 1.0]
+    ], dtype=torch.float32)
+
+    yhat = np.array([model(x).detach().numpy() for x in test_x])
+
+    print("\n{}" .format(labels))
+    for i in range(test_x.shape[0]):
+        print("{} --> {}" .format(test_x[i], yhat[i]))
 
 if __name__ == "__main__":
     main()
+
 
